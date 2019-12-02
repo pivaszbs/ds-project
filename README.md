@@ -30,3 +30,9 @@
  **ls** - ls
  
  All necessary diagrams are presented in the presentation
+
+ **мастер:**
+ ```sudo docker pull pivaszbs/dfs-project-123 && sudo docker run -p 2131:2131 pivaszbs/dfs-project-123 python master.py```
+
+ **миньон**
+ ```sudo docker pull pivaszbs/dfs-project-123 && sudo docker run -p 9000:9000 pivaszbs/dfs-project-123 python minion.py 9000 /tmp/m1```
