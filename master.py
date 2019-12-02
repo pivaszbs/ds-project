@@ -18,9 +18,6 @@ BLOCK_SIZE = 1000
 REPLICATION_FACTOR = 0
 id = 0
 
-MINIONS = {"1": ("18.219.69.40", 8000),
-           "2": ("3.14.10.243", 9000),
-           "3": ("3.14.82.18", 10000)}
 MINIONS = {}
 
 class MasterService(rpyc.Service):
@@ -63,7 +60,7 @@ class MasterService(rpyc.Service):
                 del_id.append(id)
         for delete in del_id:
             del self.minions[delete]
-            self.replication_factor -= 1
+            self.replication_factor = len(self.minions.items())
             
 
     def __init__(self, *args): 
@@ -80,11 +77,12 @@ class MasterService(rpyc.Service):
             if minion == new_minion:
                 self.minions[id] = new_minion
                 del self.dead_minions[id]
+                self.replication_factor = len(self.minions.items())
                 break
         else:
             self.minions[self.id] = new_minion
             self.id += 1
-            self.replication_factor += 1
+            self.replication_factor = len(self.minions.items())
                 
         for id, minion in self.minions.items():
             # logging.critical(minion)
@@ -92,7 +90,7 @@ class MasterService(rpyc.Service):
                 files = []
                 for file, id_arr in self.file_minions.items():
                     if id in id_arr:
-                        other_minions = [self.minions[other_id] for other_id in id_arr if id != other_id]
+                        other_minions = [self.minions[other_id] for other_id in id_arr if id != other_id and other_id not in self.dead_minions.keys()]
                         files.append((file, other_minions))
                 if files:
                     return files
@@ -128,6 +126,7 @@ class MasterService(rpyc.Service):
 
     def exposed_init(self):
         minion_addr = list(self.minions.values())
+        self.file_minions = {}
         for minion in minion_addr:
             logging.critical(minion)
             host, port = minion
@@ -144,8 +143,8 @@ class MasterService(rpyc.Service):
             if key.startswith(dir_to_ls) or dir_to_ls == '':
                 dir_content.append(key)
         if not dir_content:
-            logging.critical('Chosen directory does not exist')
-            return 'Chosen directory does not exist'
+            logging.critical('Empty directory')
+            return 'Empty directory'
         else:
             logging.critical('Content of the chosen directory is:')
             log = 'Content of the chosen directory is: \n'
@@ -191,7 +190,8 @@ class MasterService(rpyc.Service):
 
     def exposed_delete(self, path, flag):
         path = os.path.join(self.current_dir, path)
-        minion_ids = self.file_minions.get(path)
+        minion_ids = [id for id in self.file_minions.get(path) if id not in self.dead_minions.keys()]
+
         if not minion_ids:
             logging.critical("file not found")
             return
@@ -223,7 +223,8 @@ class MasterService(rpyc.Service):
 
     def exposed_copy(self, path):
         path = os.path.join(self.current_dir, path)
-        minion_ids = self.file_minions.get(path)
+        minion_ids = [id for id in self.file_minions.get(path) if id not in self.dead_minions.keys()]
+        
         if not minion_ids:
             logging.critical("file not found")
             return
@@ -246,7 +247,7 @@ class MasterService(rpyc.Service):
 
     def exposed_move(self, move_from, move_to):
         move_from = os.path.join(self.current_dir, move_from)
-        minion_ids = self.file_minions.get(move_from)
+        minion_ids = [id for id in self.file_minions.get(move_from) if id not in self.dead_minions.keys()]
         if not minion_ids:
             logging.critical("file not found")
             return
@@ -272,7 +273,7 @@ class MasterService(rpyc.Service):
     def exposed_info(self, path):
         path = os.path.join(self.current_dir, path)
         try:
-            minion_ids = self.file_minions[path]
+            minion_ids = [id for id in self.file_minions[path] if id not in self.dead_minions.keys()]
             minion_addr = [self.minions[m] for m in minion_ids]
 
             for addr in minion_addr:
@@ -289,7 +290,7 @@ class MasterService(rpyc.Service):
                         log += "Most recent content modification:" + modification_time
                         return log
                 except Exception as e:
-                    # logging.error(e)
+                    logging.error(e)
                     logging.error("unable to connect to the chosen minion.")
                     continue
                 else:
