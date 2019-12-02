@@ -164,6 +164,13 @@ if __name__ == "__main__":
         logging.debug('Getting updates...')
         for file, minions_with_file in result:
             file_path = os.path.join(DATA_DIR, file)
+            dir_arr = file.split('/')[:-1]
+            create_dir = DATA_DIR
+            for dir in dir_arr:
+                create_dir = os.path.join(create_dir, dir)
+                if not os.path.isdir(create_dir):
+                    os.mkdir(create_dir)
+
             if not os.path.exists(file_path):
                 logging.debug('Getting file ' + file)
                 for minion in minions_with_file:
